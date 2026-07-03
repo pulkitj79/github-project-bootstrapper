@@ -108,72 +108,6 @@ def find_project(
     return None
 
 
-def create_project(
-    token,
-    project_name
-):
-    owner_id = get_viewer_id(
-        token
-    )
-
-    mutation = """
-    mutation(
-      $ownerId: ID!,
-      $title: String!
-    ) {
-      createProjectV2(
-        input: {
-          ownerId: $ownerId,
-          title: $title
-        }
-      ) {
-        projectV2 {
-          id
-        }
-      }
-    }
-    """
-
-    data = graphql_request(
-        token,
-        mutation,
-        {
-            "ownerId": owner_id,
-            "title": project_name
-        }
-    )
-
-    return (
-        data
-        ["createProjectV2"]
-        ["projectV2"]
-        ["id"]
-    )
-
-
-def ensure_project_exists(
-    token,
-    project_name
-):
-    project_id = find_project(
-        token,
-        project_name
-    )
-
-    if project_id:
-        return project_id
-
-    print(
-        f"Creating project: "
-        f"{project_name}"
-    )
-
-    return create_project(
-        token,
-        project_name
-    )
-
-
 def issue_already_in_project(
     token,
     project_id,
@@ -270,32 +204,57 @@ def ensure_issue_in_project(
     github_issue,
     project_name
 ):
-    project_id = (
-        ensure_project_exists(
-            token,
-            project_name
+    try:
+
+        project_id = (
+            find_project(
+                token,
+                project_name
+            )
         )
-    )
 
-    issue_node_id = (
-        github_issue.node_id
-    )
+        if not project_id:
 
-    if issue_already_in_project(
-        token,
-        project_id,
-        issue_node_id
-    ):
-        return
+            print(
+                f"WARNING : "
+                f"Project '{project_name}' "
+                f"not found. "
+                f"Skipping project sync."
+            )
 
-    print(
-        f"Adding issue "
-        f"#{github_issue.number} "
-        f"to project"
-    )
+            return
 
-    add_issue_to_project(
-        token,
-        project_id,
-        issue_node_id
-    )
+        issue_node_id = (
+            github_issue.node_id
+        )
+
+        if issue_already_in_project(
+            token,
+            project_id,
+            issue_node_id
+        ):
+            return
+
+        print(
+            f"Adding issue "
+            f"#{github_issue.number} "
+            f"to project"
+        )
+
+        add_issue_to_project(
+            token,
+            project_id,
+            issue_node_id
+        )
+
+    except Exception as ex:
+
+        print(
+            f"WARNING : "
+            f"Project sync failed: "
+            f"{ex}"
+        )
+
+        print(
+            "Continuing issue sync..."
+        )
